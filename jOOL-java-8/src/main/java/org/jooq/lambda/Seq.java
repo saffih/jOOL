@@ -595,6 +595,35 @@ public interface Seq<T> extends Stream<T>, Iterable<T>, Collectable<T> {
     }
 
     /**
+     * Append action to stream.
+     * <p>
+     * <code><pre>
+     * // (1, 2, 3, 4, 5, 6)
+     * Seq.of(1, 2, 3).append((Void)->{System.out.println("Done");})
+     * </pre></code>
+     *
+     */
+
+    default Seq<T> append(Consumer<Void> consumer) {
+        return append(Stream.of((T) null).peek(n -> consumer.accept(null)).filter(ignore -> false));
+    }
+
+
+    /**
+     * autoclose action. It would close when fully consumed.
+     * It would not when findFirst is used.
+     * <p>
+     * <code><pre>
+     * Seq.of(1, 2, 3).onClose(()->System.out.println("Done reading 1, 2, 3")).autoclose()
+     * </pre></code>
+     *
+     */
+
+    default Seq<T> autoclose() {
+        return append((Void) -> this.close());
+    }
+
+    /**
      * Concatenate two streams.
      * <p>
      * <code><pre>
@@ -680,6 +709,19 @@ public interface Seq<T> extends Stream<T>, Iterable<T>, Collectable<T> {
     default Seq<T> prepend(Optional<? extends T> other) {
         return Seq.<T>seq(other).concat(this);
     }
+
+    /**
+     * prepend with action, trigger action when seq is process begin.
+     * <p>
+     * <code><pre>
+     * // (1, 2, 3)
+     * Seq.of(1, 2, 3).prepend((Void)->{System.out.println("Processing started");})
+     * </pre></code>
+     */
+    default Seq<T> prepend(Consumer<Void> consumer) {
+        return prepend(Stream.of((T) null).peek(n -> consumer.accept(null)).filter(ignore -> false));
+    }
+
 
     /**
      * Check whether this stream contains a given value.

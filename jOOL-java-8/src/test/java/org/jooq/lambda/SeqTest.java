@@ -15,27 +15,10 @@
  */
 package org.jooq.lambda;
 
-import static java.util.Arrays.asList;
-import static java.util.Comparator.comparing;
-import static java.util.Comparator.naturalOrder;
-import static java.util.Comparator.reverseOrder;
-import static java.util.stream.Collectors.counting;
-import static java.util.stream.Collectors.groupingBy;
-import static java.util.stream.Collectors.joining;
-import static java.util.stream.Collectors.mapping;
-import static java.util.stream.Collectors.toList;
-import static org.hamcrest.CoreMatchers.hasItems;
-import static org.jooq.lambda.Agg.count;
-import static org.jooq.lambda.Agg.max;
-import static org.jooq.lambda.Agg.min;
-import static org.jooq.lambda.Seq.seq;
-import static org.jooq.lambda.Utils.assertThrows;
-import static org.jooq.lambda.tuple.Tuple.collectors;
-import static org.jooq.lambda.tuple.Tuple.tuple;
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertThat;
-import static org.junit.Assert.assertTrue;
+import org.jooq.lambda.exception.TooManyElementsException;
+import org.jooq.lambda.function.Function4;
+import org.jooq.lambda.tuple.*;
+import org.junit.Test;
 
 import java.io.ByteArrayInputStream;
 import java.io.InputStream;
@@ -47,29 +30,20 @@ import java.time.Instant;
 import java.time.LocalDate;
 import java.util.*;
 import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.function.BiFunction;
-import java.util.function.BiPredicate;
-import java.util.function.Consumer;
-import java.util.function.Function;
-import java.util.function.Predicate;
-import java.util.function.Supplier;
+import java.util.function.*;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
-import org.jooq.lambda.exception.TooManyElementsException;
-import org.jooq.lambda.function.Function4;
 
-import org.jooq.lambda.tuple.Tuple;
-import org.jooq.lambda.tuple.Tuple2;
-import org.jooq.lambda.tuple.Tuple3;
-import org.jooq.lambda.tuple.Tuple4;
-import org.jooq.lambda.tuple.Tuple5;
-import org.jooq.lambda.tuple.Tuple6;
-import org.jooq.lambda.tuple.Tuple7;
-import org.jooq.lambda.tuple.Tuple8;
-import static org.junit.Assert.assertEquals;
-
-import org.junit.Ignore;
-import org.junit.Test;
+import static java.util.Arrays.asList;
+import static java.util.Comparator.*;
+import static java.util.stream.Collectors.*;
+import static org.hamcrest.CoreMatchers.hasItems;
+import static org.jooq.lambda.Agg.*;
+import static org.jooq.lambda.Seq.seq;
+import static org.jooq.lambda.Utils.assertThrows;
+import static org.jooq.lambda.tuple.Tuple.collectors;
+import static org.jooq.lambda.tuple.Tuple.tuple;
+import static org.junit.Assert.*;
 
 /**
  * @author Lukas Eder
@@ -2956,6 +2930,63 @@ public class SeqTest {
     public void testToUnmodifiableListOrSet() {
         assertThrows(UnsupportedOperationException.class, () -> Seq.of(1, 2, 3).toUnmodifiableList().clear());
         assertThrows(UnsupportedOperationException.class, () -> Seq.of(1, 2, 3).toUnmodifiableSet().clear());
+    }
+
+    @Test
+    public void testPrependAction() {
+        int total[] = {-100};
+        Seq.of(1, 2, 3).prepend((Void) -> total[0] = 0).forEach(it -> total[0] += it);
+
+        assertEquals(6, total[0]);
+    }
+
+    @Test
+    public void testAppendAction() {
+        int total[] = {0};
+        Seq.of(1, 2, 3).append((Void) -> total[0] += 4).forEach(it -> total[0] += it);
+
+        assertEquals(10, total[0]);
+    }
+
+    @Test
+    public void testAutoClose() {
+        int total[] = {0};
+        Seq.of(1, 2, 3)
+                .onClose(() -> {
+                    assertEquals(6, total[0]);
+                    total[0] = -1;
+                })
+                .autoclose()
+                .forEach(it -> {
+                    assertTrue(total[0] != -1);
+                    total[0] += it;
+                });
+        // -1 since it is closed
+        assertEquals(-1, total[0]);
+    }
+
+    @Test
+    public void testAutoCloseFailFindFirst() {
+        int total[] = {0};
+        Optional<Integer> first = Seq.of(1, 2, 3)
+                .onClose(() -> total[0] -= 1)
+                .autoclose()
+                .findFirst();
+        assertEquals(1, first.get().intValue());
+        // 0 since it is NOT closed
+        assertEquals(0, total[0]);
+    }
+
+    @Test
+    public void testAutoCloseFindLast() {
+        int total[] = {0};
+        Optional<Integer> first = Seq.of(1, 2, 3)
+                .onClose(() -> total[0] -= 1)
+                .autoclose()
+                .findLast();
+        assertEquals(3, first.get().intValue());
+        // -1 since it is closed
+        assertEquals(-1, total[0]);
     }
 
     /**
